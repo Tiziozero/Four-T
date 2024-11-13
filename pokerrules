@@ -1,0 +1,45 @@
+10 ways to win
+    1 - high card
+    2 - pair of cards
+    3 - two pairs of cards
+    4 - three of a kind (e.g. 3 fours or 3 nines)
+    5 - straight: 5 cards in squential order (of any suit)
+    6 - flush: 5 cards of same suit (in any order)
+    7 - full house (a pair and a three of a kind)
+    8 - four of a kind (e.g. 4 fours or 4 nines)
+    9 - straigh flush: five cards in squential order of same suit
+    10- royal flush: 10,J,Q,K and Ace of same suit
+Rules:
+    - if two people have a pair, the one with the higher number wins
+Texas Hold'em:
+    - first bet your ante ("buy in bet")
+        - usualy a small value decided by the table
+    - dealer deals two cards to each player - secret
+    - each player takes a look at their cards and choose wather or not to bet
+    - whenever there's a betting round, you can choose to:
+        - "fold"    : not playing this run
+        - "check"   : matching their bet - not bet any additional money
+            - you can only check if no one else has bet that round
+            - if someone has already bet, you can choose to:
+                - "call": match their bet/add same amount of money
+                - "raise": add more money
+                - "fold": not playing that turn
+        - "raise"   : adding more money to the betting pool
+        players unwilling to check a bet haave to fold
+        if everyone but one player folds, that player wins
+    - once everyone has bet, the dealer reveals three cards
+        - known as the "flop"
+    - when you see flop, start planing what hand you want to make
+        - still two more cards to be revealed
+    - after flop, everyone has the chance to bet again
+    - next card is revealed - the "turn"
+    - after turn, everyone has the chance to bet again
+    - next and last card is revealed - the "river"
+    - you'll see a total of seven cards:
+        - two in your hand
+        - five on the table
+    - players will bet one last time
+    - then hands are revealed
+    - goal is to create the highest hand possible
+        - using cards from your hand and table
+    - player with the best hand wins
