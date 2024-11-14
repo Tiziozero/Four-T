@@ -8,7 +8,7 @@
     7 - full house (a pair and a three of a kind)
     8 - four of a kind (e.g. 4 fours or 4 nines)
     9 - straigh flush: five cards in squential order of same suit
-    10- royal flush: 10,J,Q,K and Ace of same suit
+    10 - royal flush: 10,J,Q,K and Ace of same suit
 Rules:
     - if two people have a pair, the one with the higher number wins
 Texas Hold'em:
