@@ -293,16 +293,41 @@ impl<'a> Round<'a> {
         let mut ids_to_remove: Vec<String> = vec![];
         for id in self.clients.clone() {
             if let Some(c) = self.state.clients.get(&id.clone()){
-                let mut client = c.borrow_mut();
-                match get_user_input(format!("(user:{})Enter your bet: ", id).to_string()) {
-                    Ok(input) => {
-                        // rewritre
-                        let bet: f32 = input.trim().parse().expect("failed to unwrap variable");
-                        client.cash -= bet;
-                        self.poll += bet;
+
+                let prompt = format!("Current bet is: {}; fold(f), call(c) or rasie(r): ", self.bet).to_string();
+                // if this fails the something's wrong
+                let user_input = get_user_input(prompt).expect("failed to get user input");// fold, call, raise
+                //
+                match user_input.as_str() {
+                    "f" => {
+                        ids_to_remove.push(id.clone());
+                        println!("User {} has folded", id.clone());
                     },
-                    // if this fails then something's wrong
-                    Err(err) => panic!("Error in getting user input: {}", err),
+                    "c" => {
+                        let mut client = c.borrow_mut();
+                        match get_user_input(format!("(user:{})Enter your bet: ", id).to_string()) {
+                            Ok(input) => {
+                                // rewritre
+                                let bet: f32 = input.trim().parse().expect("failed to unwrap variable");
+                                client.cash -= bet;
+                                self.poll += bet;
+                            },
+                            // if this fails then something's wrong
+                            Err(err) => panic!("Error in getting user input: {}", err),
+                        }
+                    }
+                    "r" => {
+                        // raise
+                        let user_input = get_user_input(format!("Current bet: {} ", self.bet).to_string()).expect("failed to get user input");
+                        let new_bet: f32 = user_input.trim().parse().expect("failed to parse message");
+                        if new_bet < self.bet * 2.0 {
+                            panic!("new bet needs to be at leas twice current bet: current bet: {}, new bet: {}", self.bet, new_bet);
+                        }
+                    }
+                    _ => {
+                        // invalid operation
+                        panic!("\"{}\"; invalid operation", user_input);
+                    }
                 }
 
             } else {
