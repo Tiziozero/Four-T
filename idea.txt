@@ -1,0 +1,56 @@
+server:
+    listents to connection and handles user requests
+
+user:
+    connects to server
+    menu:
+        - create game
+        - join public game
+        - join private game
+    game data:
+    {
+        "name": ..., possible title for the game
+        "id": ...,   game id
+        "user": ..., data of user who created game
+        "users": ...,   users in the game
+        "public": ..., is game public
+    }
+
+user:create game:
+    - private/public
+    - choose key
+    request:
+    {
+        "id": ...,
+        "game_id": ...,
+        "key": ...
+    }
+server:create game:
+    - adds to "active games" map/vector
+    - if user wants to join and game is private pw key is required
+
+server:game:
+    creates state
+    awaits user connections: via websocket or smth
+
+    loops game loop:
+        checks which users can play and which want to play/quit
+        new round
+            collect ante
+            pre flop bet
+            flop
+            collect bets
+            turn
+            collect bets
+            river
+            collect bets - last
+            showdown
+        give winner money
+        end round
+            - each stage send state over.
+    bet structure:
+    {
+        "amout": ..., amount user bets
+    }
+    add logs to db
+

@@ -9,13 +9,24 @@
     8 - four of a kind (e.g. 4 fours or 4 nines)
     9 - straigh flush: five cards in squential order of same suit
     10 - royal flush: 10,J,Q,K and Ace of same suit
-Rules:
     - if two people have a pair, the one with the higher number wins
 Texas Hold'em:
     - first bet your ante ("buy in bet")
         - usualy a small value decided by the table
+        (Round::collect_ante)
+    - player on left of dealer deals small blind
+        - some sum of money
+        - usualy half of bet
+        (Round::small_blind)
+    - next player on left deals ~double of that
+        - big blind
+        - bet
+        (Round::big_blind)
+    - Pre flop bet
+        (Round::pre_flop_bet)
     - dealer deals two cards to each player - secret
     - each player takes a look at their cards and choose wather or not to bet
+    - next player after the "big blind" player's turn
     - whenever there's a betting round, you can choose to:
         - "fold"    : not playing this run
         - "check"   : matching their bet - not bet any additional money
@@ -24,9 +35,11 @@ Texas Hold'em:
                 - "call": match their bet/add same amount of money
                 - "raise": add more money
                 - "fold": not playing that turn
+            players who check still need to bet or fold
         - "raise"   : adding more money to the betting pool
         players unwilling to check a bet haave to fold
         if everyone but one player folds, that player wins
+        NOTE: the small and big blind players also need to bet, matching or raising bet
     - once everyone has bet, the dealer reveals three cards
         - known as the "flop"
     - when you see flop, start planing what hand you want to make

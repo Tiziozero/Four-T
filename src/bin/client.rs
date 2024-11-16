@@ -11,12 +11,14 @@ use std::io::{stdout, Write};
 use std::thread::sleep;
 use std::time::Duration;
 */
-use std::io::{self, Write};
+use std::{collections::HashMap, io::{self, Write}};
 use rand::{seq::SliceRandom, thread_rng};
 use std::fmt::{self, Display};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 struct State {
-    clients: Vec<Client>,
+    clients: HashMap<String,Rc<RefCell<Client>>>,
     deck: Deck
 }
 
@@ -24,7 +26,7 @@ impl State {
     pub fn new() -> Self {
         State {
             deck: generate_deck().shuffle(),
-            clients: vec![],
+            clients: HashMap::new(),
         }
     }
 }
@@ -41,10 +43,10 @@ impl Display for Suit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut s = String::new();
         match self {
-            Suit::Hearts => s.push('H'),
-            Suit::Clubs => s.push('C'),
-            Suit::Spades => s.push('S'),
-            Suit::Diamonds => s.push('D'),
+            Suit::Hearts => s.push('\u{2665}'),
+            Suit::Clubs => s.push('\u{2663}'),
+            Suit::Spades => s.push('\u{2660}'),
+            Suit::Diamonds => s.push('\u{2666}'),
         }
         write!(f, "{}", s)
     }
@@ -114,9 +116,9 @@ impl Deck {
     }
     fn shuffle(&mut self) -> Self {
         self.cards.shuffle(&mut thread_rng());
-        println!("{}", self.cards[0]);
         self.clone()
     }
+    #[allow(dead_code)]
     fn print(&self) {
         for c in &self.cards {
             let card = *c;
@@ -172,10 +174,10 @@ fn generate_deck() -> Deck {
     d
 }
 
-fn get_user_input() -> Result<String, io::Error> {
+fn get_user_input(prompt: String) -> Result<String, io::Error> {
     let mut user_input = String::new();
     let stdin = io::stdin();
-    print!("Enter your input: ");
+    print!("{}", prompt);
     let _ = std::io::stdout().flush();
     stdin.read_line(&mut user_input)?;
     user_input.pop(); // get rid of last "\n"
@@ -183,24 +185,26 @@ fn get_user_input() -> Result<String, io::Error> {
     Ok(user_input)
 }
 
-struct Round {
+struct Round<'a> {
+    poll: f32,
     ante: f32,
+    bet: f32,
     table: [Option<Card>; 5],
-    clients: Vec<Client>,
+    clients: Vec<String>,
+    state: & 'a mut State,
 }
 
-impl Round {
-    fn new(state: &mut State, clients: Vec<Client>) -> Self {
-        state.deck.print();
+impl<'a> Round<'a> {
+    fn new(state: & 'a mut State, clients: Vec<String>) -> Self {
+        // state.deck.print();
         Round {
-            ante: 5.00,
-            table: [ state.deck.get_card(),
-                state.deck.get_card(), None, None, None ],
-            clients: clients,
+            poll: 0.0,
+            ante: 2.00,
+            bet: 10.0,
+            table: [ None, None, None, None, None ],
+            clients,
+            state,
         }
-    }
-    fn flop(&mut self, state: &mut State) {
-        self.table[2] = state.deck.get_card();
     }
     fn show_table(&self) {
         for c in self.table {
@@ -212,19 +216,147 @@ impl Round {
         }
         print!("\n");
     }
+    fn collect_ante(&mut self) {
+        let mut ids_to_remove: Vec<String> = vec![];
+        for id in self.clients.clone() {
+            // c should be a &mut Rc<RefCell<Client>>
+            if let Some(c) = self.state.clients.get_mut(&id.clone()) {
+                let mut client = c.borrow_mut();
+                if client.cash < 5.0 {
+                    println!("User {} ain't got enough cash $$$. Faggot.", id);
+                    ids_to_remove.push(client.id.clone());
+                }
+                client.cash -= self.ante;
+                self.poll += self.ante;
+            } else {
+                println!("Couldn't get user with id: {}", id);
+                ids_to_remove.push(id);
+            }
+        }
+        // Remove clients by ID
+        for id in ids_to_remove {
+            println!("Removing user: {}", id);
+            self.clients.retain(|client_id| client_id != &id); // Remove by matching ID
+        }
+    }
+    fn small_blind(&mut self) {
+        // makes small bet
+    }
+    fn big_blind(&mut self) {
+        // makes minimum bet
+        self.bet = 10.0;
+    }
+    fn deal_hole_cards(&mut self) {
+        let mut ids_to_remove: Vec<String> = vec![];
+        for _ in 0..2 {
+            for id in self.clients.clone() {
+                // c should be a &mut Rc<RefCell<Client>>
+                if let Some(c) = self.state.clients.get_mut(&id.clone()) {
+                    let mut client = c.borrow_mut();
+                    if let Some(card) = self.state.deck.get_card() {
+                        client.hand.push(card);
+                    } else {
+                        panic!("Out of cards");
+                    }
+                } else {
+                    println!("Couldn't get user with id: {}", id);
+                    ids_to_remove.push(id);
+                }
+            }
+        }
+        // Remove clients by ID
+        for id in ids_to_remove {
+            println!("Removing user: {}", id);
+            self.clients.retain(|client_id| client_id != &id); // Remove by matching ID
+        }
+        for id in self.clients.clone() {
+            if let Some(c) = self.state.clients.get_mut(&id.clone()) {
+                println!("{}", c.borrow());
+            }
+        }
+    }
+    // and deal hole cards
+    fn pre_flop_bet(&mut self) {
+        // deal hole cards - two cards per player, one at a time, clockwise
+
+    }
+    fn flop(&mut self) {
+        // burns one card - to prevent card tracking 
+        // deals three comunity cards
+        self.table[0] = self.state.deck.get_card();
+        self.table[1] = self.state.deck.get_card();
+        self.table[2] = self.state.deck.get_card();
+        print!("flop:\t\t");
+        self.show_table();
+    }
+    fn bet(&mut self) {
+        let mut ids_to_remove: Vec<String> = vec![];
+        for id in self.clients.clone() {
+            if let Some(c) = self.state.clients.get(&id.clone()){
+                let mut client = c.borrow_mut();
+                match get_user_input(format!("(user:{})Enter your bet: ", id).to_string()) {
+                    Ok(input) => {
+                        // rewritre
+                        let bet: f32 = input.trim().parse().expect("failed to unwrap variable");
+                        client.cash -= bet;
+                        self.poll += bet;
+                    },
+                    // if this fails then something's wrong
+                    Err(err) => panic!("Error in getting user input: {}", err),
+                }
+
+            } else {
+                println!("Couldn't get user with id: {}", id);
+                ids_to_remove.push(id);
+            }
+        }
+        // Remove clients by ID
+        for id in ids_to_remove {
+            println!("Removing user: {}", id);
+            self.clients.retain(|client_id| client_id != &id); // Remove by matching ID
+        }
+    }
+    fn turn(&mut self) {
+        // burns one card - to prevent card tracking 
+        // deals fourth comunity cards
+        self.table[3] = self.state.deck.get_card();
+        print!("turn:\t\t");
+        self.show_table();
+    }
+    fn river(&mut self) {
+        // burns one card - to prevent card tracking 
+        // deals fift and last comunity cards
+        self.table[4] = self.state.deck.get_card();
+        print!("river:\t\t");
+        self.show_table();
+    }
+    fn showdown(&mut self) {
+    }
 }
 
 #[derive(Clone)]
 struct Client {
-    id: String,
-    hand: Vec<Card>,
+    pub id: String,
+    pub hand: Vec<Card>,
+    pub cash: f32,
+}
+
+impl Display for Client {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut s = String::new();
+        for c in self.hand.clone() {
+            s.push_str(&format!("[{}]", c).to_string());
+        }
+        write!(f, "id: {}\tcash: {}\thand: {}", self.id,self.cash,s)
+    }
 }
 
 impl Client {
     fn new(id: String) -> Self {
         Client {
-            id: id,
+            id,
             hand: vec![],
+            cash: 100.0,
         }
     }
     fn reset(&mut self) {
@@ -232,7 +364,7 @@ impl Client {
     }
 }
 
-fn black_jack() -> Result<(), io::Error> {
+fn poker() -> Result<(), io::Error> {
     print!("Enter number of users: ");
     let _ = io::stdout().flush();
     let mut user_input: String = String::new();
@@ -241,21 +373,53 @@ fn black_jack() -> Result<(), io::Error> {
     println!("Making {} users...", users);
 
     let mut state = State::new();
-    let mut clients_on: Vec<Client> = vec![];
-    
-    for i in 0..users {
-        let c = Client::new(format!("{}", i));
-        clients_on.push(c);
-    }
+    let mut clients_on: HashMap<String, Rc<RefCell<Client>>> = HashMap::new();
 
-    'mainloop: loop {
-        let r = Round::new(&mut state, clients_on.clone());
-        r.show_table();
-        break
+    for i in 0..users {
+        let client: Rc<RefCell<Client>> = Rc::new(RefCell::new(Client::new(i.to_string())));
+        let client_ref = client.borrow();
+        // println!("Client ID: {}", client_ref.id);
+        clients_on.insert(client_ref.id.clone(), Rc::clone(&client));
     }
-    Ok(())
+    state.clients = clients_on.to_owned();
+
+    loop {
+        let client_ids: Vec<String> = clients_on
+            .iter()
+            .map(|(_, c)| {
+                let client = c.borrow();
+                client.id.clone()
+            })
+            .collect::<Vec<String>>();
+        
+        let mut r = Round::new(&mut state, client_ids);
+        r.collect_ante();
+        r.small_blind();
+        r.big_blind();
+        r.deal_hole_cards();
+        // big blind can raise, too
+        r.pre_flop_bet(); // and collect
+        r.flop(); // three cards
+        r.bet(); // fold, call, raise, check
+        r.turn(); // 4th card
+        r.bet();
+        r.river();
+        r.bet();
+        r.showdown();
+
+        for (_,c) in state.clients.iter() {
+            c.borrow_mut().reset();
+        }
+
+        // break with 'q'
+        let i = get_user_input("Quit? [q/nil]: ".to_string())?;
+        if i == String::from("q") {
+            return Ok(());
+        }
+    }
+    // Ok(())
 }
 
 fn main() {
-    let _ = black_jack();
+    let _ = poker();
 }

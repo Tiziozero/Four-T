@@ -75,6 +75,7 @@ version = "0.1.0"
 dependencies = [
  "crossterm",
  "rand",
+ "yazi",
 ]
 
 [[package]]
@@ -463,3 +464,9 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "yazi"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7773623574268945095a9008f1583f7feac95bf1c4c406de5c98d02e0c0eb98"

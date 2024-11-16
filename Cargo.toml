@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 crossterm = "0.25" # or the latest version
 rand = "0.6.0"
+yazi = "0.2.0"
