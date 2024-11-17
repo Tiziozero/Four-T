@@ -1,4 +1,6 @@
-// use four_t::common::state::State;
+use four_t::common::state::State;
+use four_t::common::cards::Card;
+use four_t::common::client::Client;
 /*
 use crossterm::{
     cursor::{Hide, MoveTo},
@@ -12,167 +14,9 @@ use std::thread::sleep;
 use std::time::Duration;
 */
 use std::{collections::HashMap, io::{self, Write}};
-use rand::{seq::SliceRandom, thread_rng};
-use std::fmt::{self, Display};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-struct State {
-    clients: HashMap<String,Rc<RefCell<Client>>>,
-    deck: Deck
-}
-
-impl State {
-    pub fn new() -> Self {
-        State {
-            deck: generate_deck().shuffle(),
-            clients: HashMap::new(),
-        }
-    }
-}
-
-
-#[derive(Debug,Clone, Copy)]
-enum Suit {
-    Hearts,
-    Diamonds,
-    Clubs,
-    Spades,
-}
-impl Display for Suit {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut s = String::new();
-        match self {
-            Suit::Hearts => s.push('\u{2665}'),
-            Suit::Clubs => s.push('\u{2663}'),
-            Suit::Spades => s.push('\u{2660}'),
-            Suit::Diamonds => s.push('\u{2666}'),
-        }
-        write!(f, "{}", s)
-    }
-}
-
-
-#[derive(Debug,Clone, Copy)]
-enum Value {
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-    Seven,
-    Eight,
-    Nine,
-    Ten,
-    Jack,
-    Queen,
-    King,
-    Ace
-}
-impl Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut s = String::new();
-        match self {
-            Value::Two => s.push('2'),
-            Value::Three => s.push('3'),
-            Value::Four => s.push('4'),
-            Value::Five => s.push('5'),
-            Value::Six => s.push('6'),
-            Value::Seven => s.push('7'),
-            Value::Eight => s.push('8'),
-            Value::Nine => s.push('9'),
-            Value::Ten => s.push('T'),
-            Value::Jack => s.push('J'),
-            Value::Queen => s.push('Q'),
-            Value::King => s.push('K'),
-            Value::Ace => s.push('A'),
-        }
-        write!(f, "{}", s)
-    }
-}
-
-#[derive(Debug,Clone, Copy)]
-struct Card {
-    value: Value,
-    suit: Suit
-}
-
-impl Display for Card {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{}", self.value, self.suit)
-    }
-}
-
-#[derive(Debug,Clone)]
-struct Deck {
-    cards: Vec<Card>
-}
-
-impl Deck {
-    fn new() -> Self {
-        Deck {
-            cards: vec![],
-        }
-    }
-    fn shuffle(&mut self) -> Self {
-        self.cards.shuffle(&mut thread_rng());
-        self.clone()
-    }
-    #[allow(dead_code)]
-    fn print(&self) {
-        for c in &self.cards {
-            let card = *c;
-            let mut s = String::new();
-            match card.suit {
-                Suit::Hearts => s.push('H'),
-                Suit::Clubs => s.push('C'),
-                Suit::Spades => s.push('S'),
-                Suit::Diamonds => s.push('D'),
-            }
-            match card.value {
-                Value::Two => s.push('T'),
-                Value::Three => s.push('T'),
-                Value::Four => s.push('F'),
-                Value::Five => s.push('F'),
-                Value::Six => s.push('S'),
-                Value::Seven => s.push('S'),
-                Value::Eight => s.push('E'),
-                Value::Nine => s.push('N'),
-                Value::Ten => s.push('T'),
-                Value::Jack => s.push('J'),
-                Value::Queen => s.push('Q'),
-                Value::King => s.push('K'),
-                Value::Ace => s.push('A'),
-            }
-            print!("{};", s)
-        }
-        println!("");
-    }
-    fn get_card(&mut self) -> Option<Card> {
-        if let Some(c) = self.cards.pop() {
-            return Some(c);
-        }
-        None
-    }
-}
-
-fn generate_deck() -> Deck {
-    let suits: Vec<Suit> = vec![Suit::Hearts, Suit::Spades,
-        Suit::Clubs, Suit::Diamonds];
-    let vals: Vec<Value> = vec![
-        Value::Two, Value::Three, Value::Four, Value::Five, Value::Six,
-        Value::Seven, Value::Eight,  Value::Nine, Value::Ten,
-        Value::Jack, Value::Queen, Value::King, Value::Ace
-    ];
-    let mut d = Deck::new();
-    for s in &suits {
-        for v in &vals {
-            let c = Card{suit: *s, value: *v};
-            d.cards.push(c);
-        }
-    }
-    d
-}
 
 fn get_user_input(prompt: String) -> Result<String, io::Error> {
     let mut user_input = String::new();
@@ -191,11 +35,12 @@ struct Round<'a> {
     bet: f32,
     table: [Option<Card>; 5],
     clients: Vec<String>,
+    dealer: String,
     state: & 'a mut State,
 }
 
 impl<'a> Round<'a> {
-    fn new(state: & 'a mut State, clients: Vec<String>) -> Self {
+    fn new(state: & 'a mut State, clients: Vec<String>, dealer: String) -> Self {
         // state.deck.print();
         Round {
             poll: 0.0,
@@ -203,8 +48,17 @@ impl<'a> Round<'a> {
             bet: 10.0,
             table: [ None, None, None, None, None ],
             clients,
+            dealer,
             state,
         }
+    }
+    fn show_users(&mut self) {
+        for id in self.clients.clone() {
+            if let Some(c) = self.state.clients.get_mut(&id.clone()) {
+                println!("{}", c.borrow());
+            }
+        }
+
     }
     fn show_table(&self) {
         for c in self.table {
@@ -240,6 +94,20 @@ impl<'a> Round<'a> {
         }
     }
     fn small_blind(&mut self) {
+        let dealer_id = self.dealer.clone();
+        let client_ids = self.clients.clone();
+
+        if let Some(dealer_pos) = client_ids.iter().position(|id| *id == dealer_id) {
+            let small_blind_index = (dealer_pos + 1) % client_ids.len();
+            let small_blind_client_id = client_ids[small_blind_index].clone();
+            if let Some(c) = self.state.clients.get(&small_blind_client_id.clone()) {
+                let mut client = c.borrow_mut();
+                client.cash -= self.bet / 2.0;
+                println!("got small blind from: {}", client.id.clone());
+            } else {
+                panic!("Missing user {}", small_blind_client_id);
+            }
+        }
         // makes small bet
     }
     fn big_blind(&mut self) {
@@ -290,6 +158,7 @@ impl<'a> Round<'a> {
         self.show_table();
     }
     fn bet(&mut self) {
+        // add "check"
         let mut ids_to_remove: Vec<String> = vec![];
         for id in self.clients.clone() {
             if let Some(c) = self.state.clients.get(&id.clone()){
@@ -305,21 +174,17 @@ impl<'a> Round<'a> {
                     },
                     "c" => {
                         let mut client = c.borrow_mut();
-                        match get_user_input(format!("(user:{})Enter your bet: ", id).to_string()) {
-                            Ok(input) => {
-                                // rewritre
-                                let bet: f32 = input.trim().parse().expect("failed to unwrap variable");
-                                client.cash -= bet;
-                                self.poll += bet;
-                            },
-                            // if this fails then something's wrong
-                            Err(err) => panic!("Error in getting user input: {}", err),
-                        }
+                        client.cash -= self.bet;
+                        self.poll += self.bet;
                     }
                     "r" => {
                         // raise
-                        let user_input = get_user_input(format!("Current bet: {} ", self.bet).to_string()).expect("failed to get user input");
-                        let new_bet: f32 = user_input.trim().parse().expect("failed to parse message");
+                        let user_input = get_user_input(
+                            format!("Current bet: {} ", self.bet)
+                                .to_string()
+                            ).expect("failed to get user input");
+                        let new_bet: f32 = user_input
+                            .trim().parse().expect("failed to parse message");
                         if new_bet < self.bet * 2.0 {
                             panic!("new bet needs to be at leas twice current bet: current bet: {}, new bet: {}", self.bet, new_bet);
                         }
@@ -358,43 +223,15 @@ impl<'a> Round<'a> {
     fn showdown(&mut self) {
     }
 }
-
-#[derive(Clone)]
-struct Client {
-    pub id: String,
-    pub hand: Vec<Card>,
-    pub cash: f32,
-}
-
-impl Display for Client {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut s = String::new();
-        for c in self.hand.clone() {
-            s.push_str(&format!("[{}]", c).to_string());
-        }
-        write!(f, "id: {}\tcash: {}\thand: {}", self.id,self.cash,s)
-    }
-}
-
-impl Client {
-    fn new(id: String) -> Self {
-        Client {
-            id,
-            hand: vec![],
-            cash: 100.0,
-        }
-    }
-    fn reset(&mut self) {
-        self.hand = vec![];
-    }
-}
-
 fn poker() -> Result<(), io::Error> {
     print!("Enter number of users: ");
     let _ = io::stdout().flush();
     let mut user_input: String = String::new();
     io::stdin().read_line(& mut user_input)?;
     let users: u16 = user_input.trim().parse().expect("Failed to parse user input");
+    // if users < 2 || users > 10 {
+    //     panic!("Users must be between 2 and 10");
+    // }
     println!("Making {} users...", users);
 
     let mut state = State::new();
@@ -408,7 +245,34 @@ fn poker() -> Result<(), io::Error> {
     }
     state.clients = clients_on.to_owned();
 
+
+    let mut dealer_ids = clients_on.keys().clone();
+
     loop {
+        let mut dealer: String;
+        'get_dealer_loop: loop {
+            // get user id for dealer, this is going to be
+            // the next user in the keys of the vector ov clients
+            'get_dealer_id: loop {
+                // if there is a next in the ids set dealer to it
+                if let Some(dealer_id) = dealer_ids.next() {
+                    dealer = dealer_id.clone();
+                    break 'get_dealer_id;
+                // else reset ids with new iter
+                } else {
+                    dealer_ids = clients_on.keys().clone();
+                }
+            }
+
+
+            // if user still in vector break loo[ 
+            let client_rc = state.clients.get(&dealer.clone());
+            if let Some(_client) = client_rc {
+                break 'get_dealer_loop;
+            }
+            println!("Couldn't find a dealer")
+        }
+
         let client_ids: Vec<String> = clients_on
             .iter()
             .map(|(_, c)| {
@@ -417,20 +281,33 @@ fn poker() -> Result<(), io::Error> {
             })
             .collect::<Vec<String>>();
         
-        let mut r = Round::new(&mut state, client_ids);
+        let mut r = Round::new(&mut state, client_ids, dealer.clone());
+        r.show_users();
         r.collect_ante();
+        r.show_users();
         r.small_blind();
+        r.show_users();
         r.big_blind();
+        r.show_users();
         r.deal_hole_cards();
+        r.show_users();
         // big blind can raise, too
         r.pre_flop_bet(); // and collect
+        r.show_users();
         r.flop(); // three cards
+        r.show_users();
         r.bet(); // fold, call, raise, check
+        r.show_users();
         r.turn(); // 4th card
+        r.show_users();
         r.bet();
+        r.show_users();
         r.river();
+        r.show_users();
         r.bet();
+        r.show_users();
         r.showdown();
+        r.show_users();
 
         for (_,c) in state.clients.iter() {
             c.borrow_mut().reset();
